@@ -1,0 +1,89 @@
+name: Scheduled Content Update
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+env:
+  TARGET_REPOSITORY: ovmvo/SubShare
+  TARGET_BRANCH: main
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout workflow repository (self)
+      uses: actions/checkout@v4
+      with:
+        path: self
+
+    - name: Checkout target repository
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ env.TARGET_REPOSITORY }}
+        token: ${{ secrets.TARGET_PAT }}
+        persist-credentials: false
+        fetch-depth: 0
+        path: target
+
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+
+    - name: Setup Git identity (target)
+      working-directory: target
+      run: |
+        OWNER="${{ github.repository_owner }}"
+        NAME="$OWNER"
+        EMAIL="${OWNER}@users.noreply.github.com"
+        git config user.name "$NAME"
+        git config user.email "$EMAIL"
+        echo "Using git identity: $NAME <$EMAIL>"
+        git remote set-url origin "https://x-access-token:${{ secrets.TARGET_PAT }}@github.com/${{ env.TARGET_REPOSITORY }}.git"
+
+    - name: Install Python dependencies
+      run: python3 -m pip install --no-input --disable-pip-version-check PyYAML
+
+    - name: Clean sub directory and fetch content (Python)
+      working-directory: target
+      run: |
+        set -euo pipefail
+        python3 ../self/scripts/update_sub.py \
+          --source-url "${{ secrets.SOURCE_URL }}" \
+          --max-attempts 3
+
+    - name: Update README links and times
+      working-directory: target
+      run: |
+        python3 ../self/scripts/update_readme.py
+
+    - name: Rewrite history to single commit and force push
+      working-directory: target
+      run: |
+        set -euo pipefail
+        # 使用环境变量指定目标分支
+        default_branch="${{ env.TARGET_BRANCH }}"
+        echo "Default branch set from env: ${default_branch}"
+
+        # 创建只有当前文件树的孤立提交
+        git checkout --orphan temp-update
+        echo "Indexing files..."
+        git ls-files --others --exclude-standard | wc -l | xargs -I{} echo "Untracked files: {}" || true
+        git add -A
+        echo "Staged changes:"
+        git status -sb || true
+        git commit -m "$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+        echo "New tip commit: $(git rev-parse --short HEAD)"
+        git show --stat --oneline -n 1 || true
+
+        # 强制推送覆盖远端分支的历史，仅保留最新一条提交
+        echo "Force pushing to origin ${default_branch}..."
+        git push -f origin temp-update:${default_branch}
+        echo "Force push completed."
