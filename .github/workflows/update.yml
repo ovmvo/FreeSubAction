@@ -5,12 +5,13 @@ on:
   push:
     branches:
       - main
-
+  schedule:
+    - cron: '0 * * * *'
 permissions:
   contents: write
 
 env:
-  TARGET_REPOSITORY: ovmvo/SubShare
+  TARGET_REPOSITORY: ovmvo/FreeSub
   TARGET_BRANCH: main
 
 jobs:
@@ -48,16 +49,15 @@ jobs:
         echo "Using git identity: $NAME <$EMAIL>"
         git remote set-url origin "https://x-access-token:${{ secrets.TARGET_PAT }}@github.com/${{ env.TARGET_REPOSITORY }}.git"
 
-    - name: Install Python dependencies
-      run: python3 -m pip install --no-input --disable-pip-version-check PyYAML
-
     - name: Clean sub directory and fetch content (Python)
       working-directory: target
       run: |
         set -euo pipefail
         python3 ../self/scripts/update_sub.py \
           --source-url "${{ secrets.SOURCE_URL }}" \
-          --max-attempts 3
+          --max-attempts 3 \
+          --tg-bot-token "${{ secrets.TG_BOT_TOKEN }}" \
+          --tg-chat-id "${{ secrets.TG_CHAT_ID }}"
 
     - name: Update README links and times
       working-directory: target
@@ -79,7 +79,7 @@ jobs:
         git add -A
         echo "Staged changes:"
         git status -sb || true
-        git commit -m "$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+        git commit -m "$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S CST')"
         echo "New tip commit: $(git rev-parse --short HEAD)"
         git show --stat --oneline -n 1 || true
 

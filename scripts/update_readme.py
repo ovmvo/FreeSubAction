@@ -2,7 +2,7 @@
 import os
 import re
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from string import Template
 
@@ -10,10 +10,13 @@ from string import Template
 MARK_START = "<!-- START: AUTO-UPDATED LINKS -->"
 MARK_END = "<!-- END: AUTO-UPDATED LINKS -->"
 
+# 中国时区 (UTC+8)
+CHINA_TZ = timezone(timedelta(hours=8))
 
-def utc_now_str() -> str:
-    """Return current time string in UTC for display."""
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+
+def china_now_str() -> str:
+    """Return current time string in China timezone for display."""
+    return datetime.now(CHINA_TZ).strftime("%Y-%m-%d %H:%M:%S CST")
 
 
 def get_repo_context() -> tuple[str, str, str]:
@@ -41,16 +44,16 @@ def latest_sub_file(subdir: Path) -> Path | None:
 
 
 def file_mtime(path: Path) -> datetime | None:
-    """Return file modification time in UTC."""
+    """Return file modification time in China timezone."""
     try:
-        return datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
+        return datetime.fromtimestamp(path.stat().st_mtime, tz=CHINA_TZ)
     except Exception:
         return None
 
 
 def format_time(dt: datetime | None) -> str:
     """Format optional datetime to string or N/A."""
-    return dt.strftime("%Y-%m-%d %H:%M:%S UTC") if dt else "N/A"
+    return dt.strftime("%Y-%m-%d %H:%M:%S CST") if dt else "N/A"
 
 
 def build_context(owner: str, repo: str, branch: str, root: Path) -> dict[str, str]:
@@ -70,7 +73,7 @@ def build_context(owner: str, repo: str, branch: str, root: Path) -> dict[str, s
         "latest_link": latest_link,
         "permanent_time": permanent_time,
         "latest_time": latest_time,
-        "generated_at": utc_now_str(),
+        "generated_at": china_now_str(),
     }
 
 
