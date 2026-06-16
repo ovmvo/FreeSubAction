@@ -29,12 +29,18 @@ def download_with_retries(url: str, max_attempts: int) -> bytes | None:
     """下载数据，返回原始字节"""
     for attempt in range(1, max_attempts + 1):
         try:
-            with urllib.request.urlopen(url) as resp:
+            request = urllib.request.Request(
+                url,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+                }
+            )
+            with urllib.request.urlopen(request) as resp:
                 data = resp.read()
             if data:
                 return data
-        except Exception:
-            pass
+        except Exception as exc:
+            print(f"Download attempt {attempt} failed: {exc}", file=sys.stderr)
 
         if attempt < max_attempts:
             print("Retrying in 3 seconds...")
@@ -179,22 +185,22 @@ def main() -> int:
     latest_file.write_bytes(merged_data)
 
     # 写入 latest 后调用 Telegram Bot 上传到频道
-    if not args.tg_bot_token or not args.tg_chat_id:
-        print("Telegram upload requires both tg bot token and tg chat id.", file=sys.stderr)
-        return 1
+    # if not args.tg_bot_token or not args.tg_chat_id:
+    #     print("Telegram upload requires both tg bot token and tg chat id.", file=sys.stderr)
+    #     return 1
 
-    tg_caption = args.tg_caption.strip() or f"节点更新,共 {node_count} 个可用节点"
-    uploaded = upload_to_telegram(
-        bot_token=args.tg_bot_token,
-        chat_id=args.tg_chat_id,
-        file_name=latest_file.name,
-        file_data=merged_data,
-        caption=tg_caption,
-        max_attempts=args.max_attempts,
-    )
-    if not uploaded:
-        print("Telegram upload failed after retries.", file=sys.stderr)
-        return 1
+    # tg_caption = args.tg_caption.strip() or f"节点更新,共 {node_count} 个可用节点"
+    # uploaded = upload_to_telegram(
+    #     bot_token=args.tg_bot_token,
+    #     chat_id=args.tg_chat_id,
+    #     file_name=latest_file.name,
+    #     file_data=merged_data,
+    #     caption=tg_caption,
+    #     max_attempts=args.max_attempts,
+    # )
+    # if not uploaded:
+    #     print("Telegram upload failed after retries.", file=sys.stderr)
+    #     return 1
 
     # 根据条件写入永久订阅
     if update_permanent:
