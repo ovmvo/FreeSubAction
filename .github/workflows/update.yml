@@ -33,10 +33,17 @@ jobs:
         fetch-depth: 0
         path: target
 
-    - name: Setup Python
-      uses: actions/setup-python@v5
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
       with:
-        python-version: '3.x'
+        node-version: '22'
+
+    - name: Download proxy utilities
+      working-directory: self
+      run: |
+        curl --fail --location --retry 3 --retry-all-errors \
+          --output scripts/proxy-utils.js \
+          https://github.com/bestruirui/MiniSubConvert/releases/download/latest/proxy-utils.js
 
     - name: Setup Git identity (target)
       working-directory: target
@@ -49,20 +56,27 @@ jobs:
         echo "Using git identity: $NAME <$EMAIL>"
         git remote set-url origin "https://x-access-token:${{ secrets.TARGET_PAT }}@github.com/${{ env.TARGET_REPOSITORY }}.git"
 
-    - name: Clean sub directory and fetch content (Python)
+    - name: Clean sub directory and fetch content (Node.js)
       working-directory: target
       run: |
         set -euo pipefail
-        python3 ../self/scripts/update_sub.py \
+        node ../self/scripts/update_sub.js \
           --source-url "${{ secrets.SOURCE_URL }}" \
-          --max-attempts 3 \
-          --tg-bot-token "${{ secrets.TG_BOT_TOKEN }}" \
-          --tg-chat-id "${{ secrets.TG_CHAT_ID }}"
+          --max-attempts 3
+
+    - name: Collect raw subscriptions
+      working-directory: target
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        NODE_OPTIONS: --max-old-space-size=6918
+      run: |
+        node -e 'console.log(`Effective V8 heap limit: ${Math.round(require("node:v8").getHeapStatistics().heap_size_limit / 1024 / 1024)} MB`)'
+        node ../self/scripts/collect.js
 
     - name: Update README links and times
       working-directory: target
       run: |
-        python3 ../self/scripts/update_readme.py
+        node ../self/scripts/update_readme.js
 
     - name: Rewrite history to single commit and force push
       working-directory: target

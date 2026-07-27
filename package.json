@@ -1,0 +1,14 @@
+{
+  "name": "free-sub-action",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "collect": "node scripts/collect.js",
+    "update:sub": "node scripts/update_sub.js",
+    "update:readme": "node scripts/update_readme.js"
+  }
+}
